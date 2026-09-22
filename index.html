@@ -1,0 +1,818 @@
+
+index.html
+
+100%
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dual Time Clock</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0c1018;
+      --bg-glow: #1a2744;
+      --card: #151b28;
+      --card-border: #2a3448;
+      --text: #eef1f7;
+      --muted: #8b95a8;
+      --accent: #7eb6ff;
+      --gold: #d4b06a;
+      --face: #f4efe4;
+      --face-night: #1c2434;
+      --hand: #1a1d24;
+      --hand-night: #e8edf5;
+      --second: #c45c4a;
+      --radius: 20px;
+      --font: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      font-family: var(--ui);
+      background:
+        radial-gradient(1200px 600px at 50% -10%, var(--bg-glow), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.45;
+    }
+
+    .app {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 2.25rem 1.25rem 3.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-family: var(--font);
+      font-size: 1.85rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      color: var(--muted);
+      margin-top: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    .clocks {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 760px) {
+      .clocks { grid-template-columns: 1fr; }
+    }
+
+    .clock-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.25rem 1.35rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .photo-slot {
+      display: none;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #0c1018;
+      border: 1px solid var(--card-border);
+    }
+
+    .photo-slot.has-image {
+      display: block;
+    }
+
+    .photo-slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .photo-picker {
+      width: 100%;
+    }
+
+    .photo-picker label {
+      display: block;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .photo-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .photo-row input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+    }
+
+    .photo-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 0.55rem 0.85rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .photo-btn:hover {
+      border-color: var(--accent);
+    }
+
+    .photo-btn.danger:hover {
+      border-color: var(--second);
+      color: #f0b4aa;
+    }
+
+    .photo-name {
+      flex: 1;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .clock-wrap {
+      width: min(100%, 280px);
+      aspect-ratio: 1;
+      position: relative;
+    }
+
+    .clock-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.35));
+    }
+
+    .clock-svg.night .face { fill: var(--face-night); }
+    .clock-svg.night .rim { stroke: #3d4d6a; }
+    .clock-svg.night .tick, .clock-svg.night .num { fill: #c9d3e4; stroke: #c9d3e4; }
+    .clock-svg.night .hour-hand, .clock-svg.night .minute-hand { stroke: var(--hand-night); }
+    .clock-svg.night .hub { fill: var(--hand-night); }
+
+    .face { fill: var(--face); }
+    .rim { fill: none; stroke: #c9b48a; stroke-width: 6; }
+    .tick { stroke: #2a2e36; stroke-linecap: round; }
+    .num {
+      font-family: var(--font);
+      font-size: 16px;
+      font-weight: 600;
+      fill: #2a2e36;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+    .hour-hand, .minute-hand {
+      stroke: var(--hand);
+      stroke-linecap: round;
+      transform-origin: 100px 100px;
+    }
+    .hour-hand { stroke-width: 6.5; }
+    .minute-hand { stroke-width: 4; }
+    .second-hand {
+      stroke: var(--second);
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      transform-origin: 100px 100px;
+    }
+    .hub { fill: var(--hand); }
+    .hub-inner { fill: var(--second); }
+
+    .meta {
+      text-align: center;
+      width: 100%;
+    }
+
+    .digital {
+      font-variant-numeric: tabular-nums;
+      font-size: 1.65rem;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+    }
+
+    .date {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-top: 0.2rem;
+    }
+
+    .offset {
+      color: var(--gold);
+      font-size: 0.8rem;
+      margin-top: 0.35rem;
+      letter-spacing: 0.04em;
+    }
+
+    .tz-picker {
+      width: 100%;
+      position: relative;
+    }
+
+    .tz-picker label {
+      display: block;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .tz-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.92rem;
+      padding: 0.65rem 0.85rem;
+      outline: none;
+    }
+
+    .tz-input:focus {
+      border-color: var(--accent);
+    }
+
+    .tz-list {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      max-height: 220px;
+      overflow: auto;
+      background: #10151f;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      list-style: none;
+      z-index: 5;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      display: none;
+    }
+
+    .tz-list.open { display: block; }
+
+    .tz-list li {
+      padding: 0.5rem 0.85rem;
+      cursor: pointer;
+      font-size: 0.88rem;
+    }
+
+    .tz-list li:hover,
+    .tz-list li.active {
+      background: #1e2a40;
+    }
+
+    .tz-list li .city { color: var(--text); }
+    .tz-list li .region { color: var(--muted); font-size: 0.78rem; }
+
+    .swap {
+      display: flex;
+      justify-content: center;
+      margin-top: 1.25rem;
+    }
+
+    .swap button {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .swap button:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Dual Time Clock</h1>
+      <p>Two analog clocks. Pick any standard IANA time zone for each.</p>
+    </header>
+
+    <div class="clocks">
+      <article class="clock-card" data-clock="0">
+        <div class="photo-slot" id="photo-slot-0"><img id="photo-img-0" alt="Picture for left clock"></div>
+        <div class="clock-wrap" id="clock-0"></div>
+        <div class="meta">
+          <div class="digital" id="digital-0">--:--:--</div>
+          <div class="date" id="date-0"></div>
+          <div class="offset" id="offset-0"></div>
+        </div>
+        <div class="tz-picker">
+          <label for="tz-input-0">Time zone</label>
+          <input class="tz-input" id="tz-input-0" type="search" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="tz-list-0">
+          <ul class="tz-list" id="tz-list-0" role="listbox"></ul>
+        </div>
+        <div class="photo-picker">
+          <label for="photo-file-0">Picture</label>
+          <div class="photo-row">
+            <input id="photo-file-0" type="file" accept="image/*">
+            <button type="button" class="photo-btn" id="photo-choose-0">Choose picture</button>
+            <button type="button" class="photo-btn danger" id="photo-remove-0" hidden>Remove</button>
+            <span class="photo-name" id="photo-name-0">No picture</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="clock-card" data-clock="1">
+        <div class="photo-slot" id="photo-slot-1"><img id="photo-img-1" alt="Picture for right clock"></div>
+        <div class="clock-wrap" id="clock-1"></div>
+        <div class="meta">
+          <div class="digital" id="digital-1">--:--:--</div>
+          <div class="date" id="date-1"></div>
+          <div class="offset" id="offset-1"></div>
+        </div>
+        <div class="tz-picker">
+          <label for="tz-input-1">Time zone</label>
+          <input class="tz-input" id="tz-input-1" type="search" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="tz-list-1">
+          <ul class="tz-list" id="tz-list-1" role="listbox"></ul>
+        </div>
+        <div class="photo-picker">
+          <label for="photo-file-1">Picture</label>
+          <div class="photo-row">
+            <input id="photo-file-1" type="file" accept="image/*">
+            <button type="button" class="photo-btn" id="photo-choose-1">Choose picture</button>
+            <button type="button" class="photo-btn danger" id="photo-remove-1" hidden>Remove</button>
+            <span class="photo-name" id="photo-name-1">No picture</span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <div class="swap">
+      <button type="button" id="swap-btn">Swap time zones</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'dual-clock-timezones';
+    const PHOTO_NAMES_KEY = 'dual-clock-photo-names';
+    const PHOTO_DB = 'dual-clock';
+    const PHOTO_STORE = 'photos';
+    const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
+    const MAX_PHOTO_EDGE = 1280;
+    const FALLBACK_ZONES = [
+      'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+      'America/Anchorage', 'Pacific/Honolulu', 'America/Toronto', 'America/Mexico_City',
+      'America/Sao_Paulo', 'America/Argentina/Buenos_Aires', 'Europe/London', 'Europe/Paris',
+      'Europe/Berlin', 'Europe/Madrid', 'Europe/Rome', 'Europe/Moscow', 'Africa/Cairo',
+      'Africa/Johannesburg', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Bangkok', 'Asia/Shanghai',
+      'Asia/Tokyo', 'Asia/Seoul', 'Asia/Singapore', 'Australia/Sydney', 'Pacific/Auckland'
+    ];
+
+    const zones = (typeof Intl.supportedValuesOf === 'function'
+      ? Intl.supportedValuesOf('timeZone')
+      : FALLBACK_ZONES).slice();
+
+    if (!zones.includes('UTC')) zones.unshift('UTC');
+
+    const zoneMeta = zones.map((id) => {
+      const parts = id.split('/');
+      const city = parts[parts.length - 1].replace(/_/g, ' ');
+      const region = parts.length > 1 ? parts.slice(0, -1).join(' / ').replace(/_/g, ' ') : 'World';
+      const label = `${city} — ${region} (${id})`;
+      const search = `${id} ${city} ${region}`.toLowerCase();
+      return { id, city, region, label, search };
+    });
+
+    const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const defaults = {
+      0: zones.includes(localZone) ? localZone : 'UTC',
+      1: 'Europe/London'
+    };
+    if (defaults[0] === defaults[1]) defaults[1] = 'Asia/Tokyo';
+
+    function loadZones() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved && zones.includes(saved[0]) && zones.includes(saved[1])) return saved;
+      } catch {}
+      return { ...defaults };
+    }
+
+    const selected = loadZones();
+
+    function saveZones() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(selected));
+    }
+
+    function prettyZone(id) {
+      return id.replace(/_/g, ' ');
+    }
+
+    function partsFor(now, timeZone) {
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hourCycle: 'h23',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZoneName: 'shortOffset'
+      });
+      const bag = {};
+      for (const p of fmt.formatToParts(now)) {
+        if (p.type !== 'literal') bag[p.type] = p.value;
+      }
+      return bag;
+    }
+
+    function longName(now, timeZone) {
+      try {
+        const fmt = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longGeneric' });
+        const part = fmt.formatToParts(now).find((p) => p.type === 'timeZoneName');
+        return part ? part.value : '';
+      } catch {
+        return '';
+      }
+    }
+
+    function buildFace(root) {
+      const ticks = [];
+      for (let i = 0; i < 60; i++) {
+        const major = i % 5 === 0;
+        const len = major ? 10 : 4;
+        const width = major ? 2.2 : 1;
+        ticks.push(
+          `<line class="tick" x1="100" y1="14" x2="100" y2="${14 + len}" stroke-width="${width}" transform="rotate(${i * 6} 100 100)"/>`
+        );
+      }
+      const numbers = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n, i) => {
+        const angle = (i * 30 - 90) * Math.PI / 180;
+        const x = 100 + Math.cos(angle) * 68;
+        const y = 100 + Math.sin(angle) * 68;
+        return `<text class="num" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
+      }).join('');
+
+      root.innerHTML = `
+        <svg class="clock-svg" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="face" cx="100" cy="100" r="96"/>
+          <circle class="rim" cx="100" cy="100" r="96"/>
+          ${ticks.join('')}
+          ${numbers}
+          <line class="hour-hand" x1="100" y1="100" x2="100" y2="52"/>
+          <line class="minute-hand" x1="100" y1="100" x2="100" y2="32"/>
+          <line class="second-hand" x1="100" y1="112" x2="100" y2="24"/>
+          <circle class="hub" cx="100" cy="100" r="6"/>
+          <circle class="hub-inner" cx="100" cy="100" r="2.5"/>
+        </svg>
+      `;
+      return {
+        svg: root.querySelector('.clock-svg'),
+        hour: root.querySelector('.hour-hand'),
+        minute: root.querySelector('.minute-hand'),
+        second: root.querySelector('.second-hand')
+      };
+    }
+
+    const faces = [buildFace(document.getElementById('clock-0')), buildFace(document.getElementById('clock-1'))];
+
+    function pad(n) {
+      return String(n).padStart(2, '0');
+    }
+
+    function renderClock(index, now) {
+      const tz = selected[index];
+      const p = partsFor(now, tz);
+      const hour = Number(p.hour) % 24;
+      const minute = Number(p.minute);
+      const second = Number(p.second);
+      const ms = now.getMilliseconds();
+
+      const secondDeg = 6 * (second + ms / 1000);
+      const minuteDeg = 6 * minute + 0.1 * second;
+      const hourDeg = 30 * (hour % 12) + 0.5 * minute;
+
+      const face = faces[index];
+      face.second.style.transform = `rotate(${secondDeg}deg)`;
+      face.minute.style.transform = `rotate(${minuteDeg}deg)`;
+      face.hour.style.transform = `rotate(${hourDeg}deg)`;
+      face.svg.classList.toggle('night', hour < 6 || hour >= 19);
+
+      document.getElementById(`digital-${index}`).textContent = `${pad(hour)}:${pad(minute)}:${pad(second)}`;
+      document.getElementById(`date-${index}`).textContent =
+        `${p.weekday}, ${p.month} ${p.day}, ${p.year}`;
+      const generic = longName(now, tz);
+      const offset = p.timeZoneName || '';
+      document.getElementById(`offset-${index}`).textContent =
+        [prettyZone(tz), generic, offset].filter(Boolean).join(' · ');
+    }
+
+    function tick() {
+      const now = new Date();
+      renderClock(0, now);
+      renderClock(1, now);
+      requestAnimationFrame(tick);
+    }
+
+    function setZone(index, id) {
+      if (!zones.includes(id)) return;
+      selected[index] = id;
+      saveZones();
+      const meta = zoneMeta.find((z) => z.id === id);
+      const input = document.getElementById(`tz-input-${index}`);
+      input.value = meta ? `${meta.city} (${id})` : id;
+      input.dataset.zone = id;
+    }
+
+    function filterZones(query) {
+      const q = query.trim().toLowerCase();
+      if (!q) return zoneMeta.slice(0, 80);
+      return zoneMeta.filter((z) => z.search.includes(q)).slice(0, 80);
+    }
+
+    function bindPicker(index) {
+      const input = document.getElementById(`tz-input-${index}`);
+      const list = document.getElementById(`tz-list-${index}`);
+      let active = -1;
+      let matches = [];
+
+      function close() {
+        list.classList.remove('open');
+        list.innerHTML = '';
+        active = -1;
+      }
+
+      function show(items) {
+        matches = items;
+        active = items.length ? 0 : -1;
+        list.innerHTML = items.length
+          ? items.map((z, i) => `
+              <li role="option" data-id="${z.id}" class="${i === 0 ? 'active' : ''}">
+                <div class="city">${z.city}</div>
+                <div class="region">${z.region} · ${z.id}</div>
+              </li>`).join('')
+          : `<li class="region">No matching time zones</li>`;
+        list.classList.add('open');
+      }
+
+      function choose(id) {
+        setZone(index, id);
+        close();
+        input.blur();
+      }
+
+      input.addEventListener('focus', () => {
+        input.select();
+        show(filterZones(input.value.replace(/\s*\(.*\)$/, '')));
+      });
+
+      input.addEventListener('input', () => {
+        show(filterZones(input.value));
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (!list.classList.contains('open')) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          active = Math.min(matches.length - 1, active + 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          active = Math.max(0, active - 1);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (matches[active]) choose(matches[active].id);
+          return;
+        } else if (e.key === 'Escape') {
+          close();
+          setZone(index, selected[index]);
+          return;
+        } else {
+          return;
+        }
+        [...list.children].forEach((el, i) => el.classList.toggle('active', i === active));
+        list.children[active]?.scrollIntoView({ block: 'nearest' });
+      });
+
+      list.addEventListener('mousedown', (e) => {
+        const li = e.target.closest('li[data-id]');
+        if (li) choose(li.dataset.id);
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest(`[data-clock="${index}"]`)) {
+          close();
+          setZone(index, selected[index]);
+        }
+      });
+    }
+
+    bindPicker(0);
+    bindPicker(1);
+    setZone(0, selected[0]);
+    setZone(1, selected[1]);
+
+    document.getElementById('swap-btn').addEventListener('click', () => {
+      const a = selected[0];
+      selected[0] = selected[1];
+      selected[1] = a;
+      saveZones();
+      setZone(0, selected[0]);
+      setZone(1, selected[1]);
+    });
+
+    const photoUrls = { 0: null, 1: null };
+    const photoNames = loadPhotoNames();
+
+    function loadPhotoNames() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(PHOTO_NAMES_KEY));
+        return { 0: saved?.[0] || '', 1: saved?.[1] || '' };
+      } catch {
+        return { 0: '', 1: '' };
+      }
+    }
+
+    function savePhotoNames() {
+      localStorage.setItem(PHOTO_NAMES_KEY, JSON.stringify(photoNames));
+    }
+
+    function openPhotoDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(PHOTO_DB, 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains(PHOTO_STORE)) {
+            req.result.createObjectStore(PHOTO_STORE);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function idbPutPhoto(index, blob) {
+      const db = await openPhotoDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PHOTO_STORE, 'readwrite');
+        tx.objectStore(PHOTO_STORE).put(blob, index);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function idbGetPhoto(index) {
+      const db = await openPhotoDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PHOTO_STORE, 'readonly');
+        const req = tx.objectStore(PHOTO_STORE).get(index);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function idbDeletePhoto(index) {
+      const db = await openPhotoDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PHOTO_STORE, 'readwrite');
+        tx.objectStore(PHOTO_STORE).delete(index);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    function showPhoto(index, blob, name) {
+      const slot = document.getElementById(`photo-slot-${index}`);
+      const img = document.getElementById(`photo-img-${index}`);
+      const removeBtn = document.getElementById(`photo-remove-${index}`);
+      const nameEl = document.getElementById(`photo-name-${index}`);
+      if (photoUrls[index]) URL.revokeObjectURL(photoUrls[index]);
+      photoUrls[index] = URL.createObjectURL(blob);
+      img.src = photoUrls[index];
+      slot.classList.add('has-image');
+      removeBtn.hidden = false;
+      nameEl.textContent = name || 'Picture';
+    }
+
+    function clearPhotoView(index) {
+      const slot = document.getElementById(`photo-slot-${index}`);
+      const img = document.getElementById(`photo-img-${index}`);
+      const removeBtn = document.getElementById(`photo-remove-${index}`);
+      const nameEl = document.getElementById(`photo-name-${index}`);
+      if (photoUrls[index]) URL.revokeObjectURL(photoUrls[index]);
+      photoUrls[index] = null;
+      img.removeAttribute('src');
+      slot.classList.remove('has-image');
+      removeBtn.hidden = true;
+      nameEl.textContent = 'No picture';
+    }
+
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(image);
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('Could not read that image.'));
+        };
+        image.src = url;
+      });
+    }
+
+    async function preparePhotoBlob(file) {
+      const image = await loadImageFromFile(file);
+      const scale = Math.min(1, MAX_PHOTO_EDGE / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(image, 0, 0, width, height);
+      const type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const quality = type === 'image/jpeg' ? 0.86 : undefined;
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+      if (!blob) throw new Error('Could not prepare that picture.');
+      return blob;
+    }
+
+    async function applyPhotoFile(index, file) {
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        window.alert('Please choose an image file.');
+        return;
+      }
+      if (file.size > MAX_PHOTO_BYTES) {
+        window.alert('Please choose a picture smaller than 12 MB.');
+        return;
+      }
+      const blob = await preparePhotoBlob(file);
+      photoNames[index] = file.name || 'Picture';
+      savePhotoNames();
+      await idbPutPhoto(index, blob);
+      showPhoto(index, blob, photoNames[index]);
+    }
+
+    async function removePhoto(index) {
+      photoNames[index] = '';
+      savePhotoNames();
+      await idbDeletePhoto(index);
+      clearPhotoView(index);
+      document.getElementById(`photo-file-${index}`).value = '';
+    }
+
+    function bindPhotoPicker(index) {
+      const fileInput = document.getElementById(`photo-file-${index}`);
+      document.getElementById(`photo-choose-${index}`).addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', () => applyPhotoFile(index, fileInput.files[0]));
+      document.getElementById(`photo-remove-${index}`).addEventListener('click', () => removePhoto(index));
+    }
+
+    async function restorePhotos() {
+      for (const index of [0, 1]) {
+        try {
+          const blob = await idbGetPhoto(index);
+          if (blob) showPhoto(index, blob, photoNames[index]);
+        } catch {}
+      }
+    }
+
+    bindPhotoPicker(0);
+    bindPhotoPicker(1);
+    restorePhotos();
+
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
+Displaying index.html.
